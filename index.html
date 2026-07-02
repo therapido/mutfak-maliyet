@@ -1585,8 +1585,15 @@ function _parseMalz(wb){
       else if(f==='grup') m.grup=String(v).trim();
       else if(f==='tedarikci') m.tedarikci=String(v).trim();
       else if(f==='marka') m.marka=String(v).trim();
-      else if(f==='alisFiyati') m.alisFiyati=parseFloat(String(v).replace(/[₺\s.]/g,'').replace(',','.'))||0;
-      else if(f==='alisMiktari') m.alisMiktari=parseFloat(String(v).replace(',','.'))||1;
+      else if(f==='alisFiyati'){
+        // Zaten sayıysa direkt kullan, string ise Türkçe formatı çöz
+        if(typeof v === 'number') m.alisFiyati = v;
+        else m.alisFiyati = parseFloat(String(v).replace(/[₺\s]/g,'').replace(/\./g,'').replace(',','.')) || 0;
+      }
+      else if(f==='alisMiktari'){
+        if(typeof v === 'number') m.alisMiktari = v;
+        else m.alisMiktari = parseFloat(String(v).replace(',','.')) || 1;
+      }
       else if(f==='birim') m.birim=normBirim(String(v).trim());
       else if(f==='fire') m.fire=parseFloat(String(v))||0;
     });
