@@ -2803,12 +2803,16 @@ const loginScreen = document.getElementById('loginScreen');
 const appRoot     = document.getElementById('appRoot');
 
 function showApp(user){
-  driveUser = user;
-  loginScreen.style.display = 'none';
-  appRoot.style.display     = '';
-  document.getElementById('driveUserName').textContent = user.name;
-  document.getElementById('driveUserEmail').textContent = user.email;
-  driveLoadOrCreate();
+  try{
+    driveUser = user;
+    loginScreen.style.display = 'none';
+    appRoot.style.display     = '';
+    const nameEl = document.getElementById('driveUserName');
+    if(nameEl) nameEl.textContent = user.name;
+    driveLoadOrCreate();
+  }catch(e){
+    console.error('showApp hatası:', e);
+  }
 }
 
 // ── GAPI yüklendi ──────────────────────────────────────
@@ -2828,12 +2832,18 @@ function gisLoaded(){
     client_id: CLIENT_ID,
     scope:     SCOPES,
     callback:  async (resp)=>{
-      if(resp.error){ console.error(resp); return; }
-      // Token alındı, kullanıcı bilgisini çek
-      const info = await fetch('https://www.googleapis.com/oauth2/v3/userinfo',{
-        headers:{Authorization:'Bearer '+gapi.client.getToken().access_token}
-      }).then(r=>r.json());
-      showApp({name: info.name||info.email, email: info.email, picture: info.picture});
+      try{
+        if(resp.error){ console.error('OAuth hatası:', resp); return; }
+        const token = gapi.client.getToken();
+        if(!token){ console.error('Token yok'); return; }
+        const info = await fetch('https://www.googleapis.com/oauth2/v3/userinfo',{
+          headers:{Authorization:'Bearer '+token.access_token}
+        }).then(r=>r.json());
+        showApp({name: info.name||info.email, email: info.email});
+      }catch(e){
+        console.error('Giriş hatası:', e);
+        alert('Giriş hatası: '+e.message);
+      }
     }
   });
   gisReady = true;
