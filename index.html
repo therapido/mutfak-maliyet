@@ -2830,28 +2830,24 @@ function gapiLoaded(){
 function gisLoaded(){
   tokenClient = google.accounts.oauth2.initTokenClient({
     client_id: CLIENT_ID,
-    scope:     SCOPES,
-    callback: async (resp)=>{
+    scope: SCOPES,
+    callback: async (resp) => {
+      if(resp.error){ alert('OAuth hatası: '+resp.error); return; }
+      const accessToken = resp.access_token;
+      if(!accessToken){ alert('Token alınamadı'); return; }
+      window._accessToken = accessToken;
       try{
-        if(resp.error){ alert('OAuth hatası: ' + resp.error); return; }
-        const accessToken = resp.access_token;
-        if(!accessToken){ alert('Token alınamadı!'); return; }
-        // Token'ı gapi'ye set et (yüklendiyse)
-        if(typeof gapi !== 'undefined' && gapi.client){
-          gapi.client.setToken({access_token: accessToken});
-        }
-        window._accessToken = accessToken; // yedek olarak sakla
         const info = await fetch('https://www.googleapis.com/oauth2/v3/userinfo',{
           headers:{Authorization:'Bearer '+accessToken}
         }).then(r=>r.json());
+        driveUser = {name: info.name||info.email, email: info.email, token: accessToken};
         document.getElementById('loginScreen').style.display = 'none';
         document.getElementById('appRoot').style.display = '';
         const nameEl = document.getElementById('driveUserName');
-        if(nameEl) nameEl.textContent = info.name||info.email;
-        driveUser = {name: info.name||info.email, email: info.email, token: accessToken};
+        if(nameEl) nameEl.textContent = driveUser.name;
         driveLoadOrCreate();
       }catch(e){
-        alert('Hata: '+e.message);
+        alert('Giriş hatası: '+e.message);
       }
     }
   });
