@@ -319,6 +319,7 @@
 <div id="appRoot" style="display:none">
 <header>
   <div class="brand"><b>Mutfak Maliyet</b><span>Base Bungalows</span></div>
+  <div style="font-size:10px;color:rgba(255,255,255,.4);margin-left:8px">v7</div>
   <div class="sp"></div>
   <div style="display:flex;align-items:center;gap:10px;margin-right:8px">
     <span style="font-size:12px;color:#eef3f0;opacity:.8"><span id="driveUserName"></span></span>
@@ -1586,9 +1587,22 @@ function _parseMalz(wb){
       else if(f==='tedarikci') m.tedarikci=String(v).trim();
       else if(f==='marka') m.marka=String(v).trim();
       else if(f==='alisFiyati'){
-        // Zaten sayıysa direkt kullan, string ise Türkçe formatı çöz
-        if(typeof v === 'number') m.alisFiyati = v;
-        else m.alisFiyati = parseFloat(String(v).replace(/[₺\s]/g,'').replace(/\./g,'').replace(',','.')) || 0;
+        // v tipi ne olursa olsun doğru çöz
+        if(typeof v === 'number'){
+          m.alisFiyati = v;
+        } else {
+          const s = String(v).replace(/[₺\s]/g,'');
+          // Türkçe format: 1.122,29 → nokta binlik, virgül ondalık
+          // İngilizce format: 1122.29 → nokta ondalık
+          if(s.includes(',') && s.includes('.')){
+            // Türkçe: noktaları sil, virgülü noktaya çevir
+            m.alisFiyati = parseFloat(s.replace(/\./g,'').replace(',','.')) || 0;
+          } else if(s.includes(',')){
+            m.alisFiyati = parseFloat(s.replace(',','.')) || 0;
+          } else {
+            m.alisFiyati = parseFloat(s) || 0;
+          }
+        }
       }
       else if(f==='alisMiktari'){
         if(typeof v === 'number') m.alisMiktari = v;
