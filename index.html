@@ -2831,18 +2831,24 @@ function gisLoaded(){
   tokenClient = google.accounts.oauth2.initTokenClient({
     client_id: CLIENT_ID,
     scope:     SCOPES,
-    callback:  async (resp)=>{
+    callback: async (resp)=>{
+      alert('Callback çalıştı: ' + JSON.stringify({error: resp.error, token: !!gapi.client.getToken()}));
       try{
-        if(resp.error){ console.error('OAuth hatası:', resp); return; }
+        if(resp.error){ alert('OAuth hatası: ' + resp.error); return; }
         const token = gapi.client.getToken();
-        if(!token){ console.error('Token yok'); return; }
+        if(!token){ alert('Token yok!'); return; }
         const info = await fetch('https://www.googleapis.com/oauth2/v3/userinfo',{
           headers:{Authorization:'Bearer '+token.access_token}
         }).then(r=>r.json());
-        showApp({name: info.name||info.email, email: info.email});
+        alert('Kullanıcı: ' + info.email);
+        document.getElementById('loginScreen').style.display = 'none';
+        document.getElementById('appRoot').style.display = '';
+        const nameEl = document.getElementById('driveUserName');
+        if(nameEl) nameEl.textContent = info.name||info.email;
+        driveUser = {name: info.name||info.email, email: info.email};
+        driveLoadOrCreate();
       }catch(e){
-        console.error('Giriş hatası:', e);
-        alert('Giriş hatası: '+e.message);
+        alert('Hata: '+e.message);
       }
     }
   });
