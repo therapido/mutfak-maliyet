@@ -1783,8 +1783,11 @@ document.getElementById('ayarlarKapat').addEventListener('click',closeDrawer);
 _overlay.addEventListener('click',closeDrawer);
 
 document.getElementById('sistemAktarBtn').addEventListener('click',()=>{
-  document.getElementById('sistemAktarFile').value='';
-  document.getElementById('sistemAktarFile').click();
+  closeDrawer();
+  setTimeout(()=>{
+    document.getElementById('sistemAktarFile').value='';
+    document.getElementById('sistemAktarFile').click();
+  }, 300);
 });
 
 document.getElementById('sistemAktarFile').addEventListener('change',e=>{
@@ -1793,11 +1796,20 @@ document.getElementById('sistemAktarFile').addEventListener('change',e=>{
   reader.onload=ev=>{
     try{
       const wb=XLSX.read(ev.target.result,{type:'array'});
-      // 1. Malzemeleri oku
+      // Sayfa adlarını göster
+      const sheetNames=wb.SheetNames;
+      console.log('Sayfalar:', sheetNames);
       const malzList=_parseMalz(wb);
+      console.log('Malzeme sayısı:', malzList.length);
       const mamulList=_parseMamul(wb,malzList);
+      console.log('Mamul sayısı:', mamulList.length);
       const tarifList=_parseTarif(wb,malzList,mamulList);
+      console.log('Tarif sayısı:', tarifList.length);
       const tedList=_parseTed(wb);
+      if(!malzList.length&&!mamulList.length&&!tarifList.length){
+        alert('Veri okunamadı.\nSayfalar: '+sheetNames.join(', ')+'\n\nMalzeme: '+malzList.length+', Mamul: '+mamulList.length+', Tarif: '+tarifList.length);
+        return;
+      }
       _importData={malz:malzList,mamul:mamulList,tarif:tarifList,ted:tedList};
       document.getElementById('itab-malz-count').textContent=malzList.length?`(${malzList.length})`:'';
       document.getElementById('itab-mamul-count').textContent=mamulList.length?`(${mamulList.length})`:'';
@@ -1806,7 +1818,10 @@ document.getElementById('sistemAktarFile').addEventListener('change',e=>{
       _renderImportTab('malz');
       document.getElementById('importModal').style.display='';
       toast(`${malzList.length} malzeme, ${mamulList.length} mamul, ${tarifList.length} tarif, ${tedList.length} tedarikçi hazır.`);
-    }catch(err){toast('Excel okunamadı: '+err.message);}
+    }catch(err){
+      console.error('Import hatası:', err);
+      alert('Excel okunamadı: '+err.message+'\n'+err.stack);
+    }
   };
   reader.readAsArrayBuffer(file);
 });
