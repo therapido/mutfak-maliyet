@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html>
+<head><meta charset="UTF-8"><title>OAuth Test</title></head>
+<body>
+<h2>OAuth Test</h2>
+<button onclick="signIn()">Google ile Giriş Yap</button>
+<div id="log" style="font-family:monospace;margin-top:20px;white-space:pre"></div>
+
+<script>
+const CLIENT_ID = '708742039265-4j90ivdce58cvu7fq3k923akemq88p6q.apps.googleusercontent.com';
+const SCOPES = 'https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/userinfo.profile';
+let tokenClient;
+
+function log(msg){ document.getElementById('log').textContent += '\n'+msg; console.log(msg); }
+
+function gisLoaded(){
+  log('GIS yüklendi');
+  tokenClient = google.accounts.oauth2.initTokenClient({
+    client_id: CLIENT_ID,
+    scope: SCOPES,
+    callback: async (resp) => {
+      log('Callback: ' + JSON.stringify(resp).substring(0,100));
+      if(resp.error){ log('HATA: '+resp.error); return; }
+      log('Token alındı: ' + resp.access_token.substring(0,20)+'...');
+      const info = await fetch('https://www.googleapis.com/oauth2/v3/userinfo',{
+        headers:{Authorization:'Bearer '+resp.access_token}
+      }).then(r=>r.json());
+      log('Kullanıcı: ' + JSON.stringify(info));
+      
+      // Drive testi
+      const files = await fetch('https://www.googleapis.com/drive/v3/files?q='+encodeURIComponent("name='mutfak_sistemi.json' and trashed=false")+'&fields=files(id,name)',{
+        headers:{Authorization:'Bearer '+resp.access_token}
+      }).then(r=>r.json());
+      log('Drive dosyaları: ' + JSON.stringify(files));
+    }
+  });
+  document.querySelector('button').disabled = false;
+  log('Buton aktif');
+}
+
+function signIn(){
+  log('signIn çağrıldı');
+  tokenClient.requestAccessToken({prompt:'select_account'});
+}
+
+window.gisLoaded = gisLoaded;
+</script>
+<script src="https://accounts.google.com/gsi/client" onload="gisLoaded()" async defer></script>
+</body>
+</html>
