@@ -381,7 +381,8 @@
 </aside>
 
 <nav>
-  <button data-tab="malzemeler" class="active">Malzemeler</button>
+  <button data-tab="malzemeler" data-dept="Mutfak" class="active">Mutfak Malzemeleri</button>
+  <button data-tab="malzemeler" data-dept="Bar">Bar Malzemeleri</button>
   <button data-tab="yari" data-dept="Mutfak">Mutfak Mamulleri</button>
   <button data-tab="tarifler">Mutfak Tarifleri</button>
   <button data-tab="yari" data-dept="Bar">Bar Mamulleri</button>
@@ -427,7 +428,7 @@
 <main>
   <!-- MALZEMELER -->
   <section class="panel active" id="tab-malzemeler">
-    <div class="h2-row"><h2>Malzemeler</h2><span class="info-wrap"><button class="info-btn" type="button">i</button><div class="info-popover">Satın aldığın ham malzemeler. Fire = soyma, ayıklama gibi kullanamadığın kısım. Tablo, kullanılabilir birim başına gerçek maliyeti hesaplar. Satırları sürükleyip gruplar arasında taşıyabilirsin.</div></span></div>
+    <div class="h2-row"><h2 id="malzBaslik">Mutfak Malzemeleri</h2><span class="info-wrap"><button class="info-btn" type="button">i</button><div class="info-popover">Satın aldığın ham malzemeler. Fire = soyma, ayıklama gibi kullanamadığın kısım. Tablo, kullanılabilir birim başına gerçek maliyeti hesaplar. Satırları sürükleyip gruplar arasında taşıyabilirsin.</div></span></div>
     <div class="editor-head">
       <div class="field" style="flex:1;min-width:160px"><input id="malzSearch" placeholder="malzeme ara..."></div>
       <select id="malzTedFilter" class="filter-sel"><option value="">Tüm tedarikçiler</option></select>
@@ -578,7 +579,7 @@ document.addEventListener('click',()=>{document.querySelectorAll('.info-popover.
 
 /* ============ STATE ============ */
 let state = { malzemeler:[], yariMamuller:[], tarifler:[], genel:{giderKalemleri:[],ciro:0,adet:0,yontem:"ciro"} };
-let expandedRecipes=new Set(), expandedYari=new Set(), yariFilter="", recipeFilter="", malzFilter="", malzTedFil="";
+let expandedRecipes=new Set(), expandedYari=new Set(), yariFilter="", recipeFilter="", malzFilter="", malzTedFil="", malzDept="Mutfak";
 const uid=()=>Math.random().toString(36).slice(2,9);
 
 function seed(){
@@ -877,6 +878,7 @@ function renderMalz(){
   const q=(malzFilter||'').trim().toLocaleLowerCase('tr-TR');
   const tFil=(malzTedFil||'').trim();
   const passes=m=>{
+    if((m.bolum||'Mutfak')!==malzDept) return false;
     if(q&&!(m.ad||'').toLocaleLowerCase('tr-TR').includes(q))return false;
     if(tFil&&(m.tedarikci||'')!==tFil)return false;
     return true;
@@ -900,7 +902,7 @@ function renderMalz(){
   }
   tb.innerHTML=html;
 }
-function addMalz(){state.malzemeler.push({id:uid(),ad:"",grup:"",marka:"",tedarikci:"",alisFiyati:0,alisMiktari:1,birim:"kg",fire:0,altBirim:"",altOran:0,gramDegeri:null});malzFilter="";const ms=document.getElementById('malzSearch');if(ms)ms.value="";save();renderMalz();}
+function addMalz(){state.malzemeler.push({id:uid(),ad:"",bolum:malzDept,grup:"",marka:"",tedarikci:"",alisFiyati:0,alisMiktari:1,birim:"kg",fire:0,altBirim:"",altOran:0,gramDegeri:null});malzFilter="";const ms=document.getElementById('malzSearch');if(ms)ms.value="";save();renderMalz();}
 function addGrup(){
   const ad=prompt('Yeni grup adı (örn. Yağlar, Sebzeler, Şarküteri):');
   if(!ad||!ad.trim())return;
@@ -1336,7 +1338,7 @@ function load(){
   return false;
 }function migrateLine(l){if(l.tip)return{tip:l.tip,kaynakId:l.kaynakId,miktar:Number(l.miktar)||0,girisBirimi:l.girisBirimi||'base'};return{tip:"malzeme",kaynakId:l.malzemeId,miktar:Number(l.miktar)||0,girisBirimi:'base'};}
 function normalize(s){
-  s.malzemeler=(s.malzemeler||[]).map(m=>({marka:'',tedarikci:'',...m,birim:normBirim(m.birim||'g')}));
+  s.malzemeler=(s.malzemeler||[]).map(m=>({bolum:'Mutfak',marka:'',tedarikci:'',...m,birim:normBirim(m.birim||'g')}));
   s.malzemeGruplari=s.malzemeGruplari||[...new Set(s.malzemeler.map(m=>m.grup).filter(Boolean))];
   s.tarifGruplari=s.tarifGruplari||[];
   s.yariGruplari=s.yariGruplari||[];
@@ -1392,7 +1394,13 @@ document.querySelectorAll('nav button').forEach(b=>b.addEventListener('click',()
   document.querySelectorAll('.panel').forEach(x=>x.classList.remove('active'));
   b.classList.add('active');
   document.getElementById('tab-'+b.dataset.tab).classList.add('active');
-  if(b.dataset.dept){yariDept=b.dataset.dept;} // Yarı mamul dept seç
+  if(b.dataset.tab==='malzemeler'&&b.dataset.dept){
+    malzDept=b.dataset.dept;
+    const baslik=document.getElementById('malzBaslik');
+    if(baslik) baslik.textContent=(malzDept==='Bar'?'Bar Malzemeleri':'Mutfak Malzemeleri');
+    renderMalz();
+  }
+  if(b.dataset.dept&&b.dataset.tab==='yari'){yariDept=b.dataset.dept;}
   if(b.dataset.tab==='ozet')renderOzet();
   if(b.dataset.tab==='tarifler')renderTarifler();
   if(b.dataset.tab==='yari'){
@@ -1594,12 +1602,12 @@ function _parseMalz(wb){
   const COL={
     'malzeme adı':'ad','malzeme':'ad',
     'grup':'grup','grup (öneri)':'grup',
-    'tedarikçi':'tedarikci','tedari̇kçi':'tedarikci',
+    'tedarikçi':'tedarikci','tedari̇kçi':'tedarikci','tedarikci':'tedarikci',
+    'marka':'marka',
     'alış fiyatı (₺)':'alisFiyati','alış fiyatı':'alisFiyati',
     'alış miktarı':'alisMiktari','miktar':'alisMiktari','alış mi̇ktarı':'alisMiktari',
     'birim':'birim','bi̇ri̇m':'birim',
     'fire %':'fire','fire':'fire',
-    'marka':'marka',
   };
   const raw=XLSX.utils.sheet_to_json(ws,{defval:''});
   if(!raw.length) return [];
@@ -2196,7 +2204,8 @@ function exportExcel(){
 
   // 1) Malzemeler
   const malzRows=state.malzemeler.map(m=>({
-    "Malzeme":m.ad, "Alış fiyatı (₺)":Number(m.alisFiyati)||0, "Alış miktarı":Number(m.alisMiktari)||0,
+    "Malzeme":m.ad, "Grup":m.grup||"", "Tedarikçi":m.tedarikci||"", "Marka":m.marka||"",
+    "Alış fiyatı (₺)":Number(m.alisFiyati)||0, "Alış miktarı":Number(m.alisMiktari)||0,
     "Birim":m.birim, "Fire %":Number(m.fire)||0, "Net birim maliyet (₺)":Math.round(netBirim(m)*100)/100
   }));
   XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(malzRows),"Malzemeler");
