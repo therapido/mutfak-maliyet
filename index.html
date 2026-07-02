@@ -1568,106 +1568,174 @@ function _parseTed(wb){
       sicakSatis:(r['Sıcak Satış']||'').toString().toLowerCase()==='evet',not:''};
   }).filter(t=>t.ad);
 }
+function _parseNum(v){
+  if(typeof v==='number') return v;
+  const s=String(v||'').replace(/[₺\s]/g,'');
+  if(s.includes(',')&&s.includes('.')) return parseFloat(s.replace(/\./g,'').replace(',','.'))||0;
+  if(s.includes(',')) return parseFloat(s.replace(',','.'))||0;
+  return parseFloat(s)||0;
+}
+
+function _normAd(s){ return String(s||'').toLocaleLowerCase('tr-TR').trim(); }
+
+function _esles(ad, malzList, mamulList){
+  const adL=_normAd(ad.replace(/\s*\([^)]*\)/g,'').trim());
+  const y=mamulList&&mamulList.find(x=>_normAd(x.ad)===adL);
+  const m=malzList&&malzList.find(x=>_normAd(x.ad)===adL);
+  if(y) return {tip:'yari',kaynakId:y.id};
+  if(m) return {tip:'malzeme',kaynakId:m.id};
+  return {tip:'malzeme',kaynakId:''};
+}
+
 function _parseMalz(wb){
-  const ws = wb.Sheets['Malzeme Listesi']; if(!ws) return [];
-  const COL = {'malzeme adı':'ad','malzeme':'ad','grup':'grup','grup (öneri)':'grup',
-    'tedarikçi':'tedarikci','tedari̇kçi':'tedarikci','alış fiyatı (₺)':'alisFiyati',
-    'alış fiyatı':'alisFiyati','alış miktarı':'alisMiktari','miktar':'alisMiktari',
-    'alış mi̇ktarı':'alisMiktari','birim':'birim','bi̇ri̇m':'birim','fire %':'fire','marka':'marka'};
-  const raw = XLSX.utils.sheet_to_json(ws,{defval:''});
+  // Hem eski ('Malzemeler') hem yeni ('Malzeme Listesi') sayfa adını destekle
+  const ws=wb.Sheets['Malzeme Listesi']||wb.Sheets['Malzemeler'];
+  if(!ws) return [];
+  const COL={
+    'malzeme adı':'ad','malzeme':'ad',
+    'grup':'grup','grup (öneri)':'grup',
+    'tedarikçi':'tedarikci','tedari̇kçi':'tedarikci',
+    'alış fiyatı (₺)':'alisFiyati','alış fiyatı':'alisFiyati',
+    'alış miktarı':'alisMiktari','miktar':'alisMiktari','alış mi̇ktarı':'alisMiktari',
+    'birim':'birim','bi̇ri̇m':'birim',
+    'fire %':'fire','fire':'fire',
+    'marka':'marka',
+  };
+  const raw=XLSX.utils.sheet_to_json(ws,{defval:''});
   if(!raw.length) return [];
-  const keys = Object.keys(raw[0]);
-  const fmap = {};
-  keys.forEach(k=>{ const n=k.trim().toLocaleLowerCase('tr-TR'); if(COL[n]) fmap[k]=COL[n]; });
+  const fmap={};
+  Object.keys(raw[0]).forEach(k=>{
+    const n=k.trim().toLocaleLowerCase('tr-TR');
+    if(COL[n]) fmap[k]=COL[n];
+  });
   return raw.map(r=>{
     const m={id:uid(),ad:'',grup:'',tedarikci:'',marka:'',alisFiyati:0,alisMiktari:1,birim:'',fire:0,altBirim:'',altOran:0,gramDegeri:null};
-    Object.keys(r).forEach(k=>{ const f=fmap[k]; if(!f) return; const v=r[k];
+    Object.keys(r).forEach(k=>{
+      const f=fmap[k]; if(!f) return; const v=r[k];
       if(f==='ad') m.ad=String(v).trim();
       else if(f==='grup') m.grup=String(v).trim();
       else if(f==='tedarikci') m.tedarikci=String(v).trim();
       else if(f==='marka') m.marka=String(v).trim();
-      else if(f==='alisFiyati'){
-        // v tipi ne olursa olsun doğru çöz
-        if(typeof v === 'number'){
-          m.alisFiyati = v;
-        } else {
-          const s = String(v).replace(/[₺\s]/g,'');
-          // Türkçe format: 1.122,29 → nokta binlik, virgül ondalık
-          // İngilizce format: 1122.29 → nokta ondalık
-          if(s.includes(',') && s.includes('.')){
-            // Türkçe: noktaları sil, virgülü noktaya çevir
-            m.alisFiyati = parseFloat(s.replace(/\./g,'').replace(',','.')) || 0;
-          } else if(s.includes(',')){
-            m.alisFiyati = parseFloat(s.replace(',','.')) || 0;
-          } else {
-            m.alisFiyati = parseFloat(s) || 0;
-          }
-        }
-      }
-      else if(f==='alisMiktari'){
-        if(typeof v === 'number') m.alisMiktari = v;
-        else m.alisMiktari = parseFloat(String(v).replace(',','.')) || 1;
-      }
+      else if(f==='alisFiyati') m.alisFiyati=_parseNum(v);
+      else if(f==='alisMiktari') m.alisMiktari=_parseNum(v)||1;
       else if(f==='birim') m.birim=normBirim(String(v).trim());
-      else if(f==='fire') m.fire=parseFloat(String(v))||0;
+      else if(f==='fire') m.fire=_parseNum(v);
     });
     return m;
   }).filter(m=>m.ad);
 }
 
 function _parseMamul(wb, malzList){
-  const ws = wb.Sheets['Mutfak Mamulleri']; if(!ws) return [];
-  const rows = XLSX.utils.sheet_to_json(ws,{header:1,defval:''});
-  const mamuller=[]; let cur=null;
-  for(let i=1;i<rows.length;i++){
-    const r=rows[i];
-    const ad=String(r[0]||'').trim();
-    const malz=String(r[5]||'').trim();
-    if(ad&&!malz){
-      if(cur) mamuller.push(cur);
-      cur={id:uid(),ad,bolum:'Mutfak',grup:'',ciktiMiktar:parseFloat(String(r[1]).replace(',','.'))||0,
-           ciktiBirim:normBirim(String(r[2]||'').trim())||'g',porsiyonSayisi:1,satirlar:[]};
-    } else if(cur&&malz){
-      const miktar=parseFloat(String(r[6]||'').replace(',','.'))||0;
-      const birim=normBirim(String(r[7]||'').trim())||'g';
-      const temiz=malz.replace(/\s*\(yarı mamul\)/gi,'').replace(/\s*\(yarı\)/gi,'').trim();
-      const temizL=temiz.toLocaleLowerCase('tr-TR');
-      const mE=malzList.find(m=>(m.ad||'').toLocaleLowerCase('tr-TR')===temizL);
-      cur.satirlar.push({id:uid(),tip:mE?'malzeme':'malzeme',kaynakId:mE?mE.id:'',miktar,girisBirimi:birim,_ad:malz});
+  // Yeni format: tek sayfa 'Mutfak Mamulleri' (akordeon yapı)
+  // Eski format: 'Yarı Mamuller' + 'Yarı Mamul İçerikleri' (iki ayrı sayfa)
+  const wsYeni=wb.Sheets['Mutfak Mamulleri'];
+  const wsEski=wb.Sheets['Yarı Mamuller'];
+  const wsIcerik=wb.Sheets['Yarı Mamul İçerikleri'];
+
+  if(wsYeni){
+    // Yeni format: akordeon
+    const rows=XLSX.utils.sheet_to_json(wsYeni,{header:1,defval:''});
+    const mamuller=[]; let cur=null;
+    for(let i=1;i<rows.length;i++){
+      const r=rows[i];
+      const ad=String(r[0]||'').trim();
+      const malz=String(r[5]||'').trim();
+      if(ad&&!malz){
+        if(cur) mamuller.push(cur);
+        cur={id:uid(),ad,bolum:'Mutfak',grup:'',ciktiMiktar:_parseNum(r[1])||0,
+             ciktiBirim:normBirim(String(r[2]||'').trim())||'g',porsiyonSayisi:1,satirlar:[]};
+      } else if(cur&&malz){
+        const e=_esles(malz,malzList,[]);
+        cur.satirlar.push({id:uid(),...e,miktar:_parseNum(r[6]),girisBirimi:normBirim(String(r[7]||'').trim())||'g',_ad:malz});
+      }
     }
+    if(cur) mamuller.push(cur);
+    return mamuller.filter(m=>m.ad);
   }
-  if(cur) mamuller.push(cur);
-  return mamuller.filter(m=>m.ad);
+
+  if(wsEski&&wsIcerik){
+    // Eski format: iki sayfa
+    const mamulRows=XLSX.utils.sheet_to_json(wsEski,{defval:''});
+    const icerikRows=XLSX.utils.sheet_to_json(wsIcerik,{defval:''});
+    const mamuller=mamulRows.map(r=>({
+      id:uid(),
+      ad:String(r['Yarı mamul']||r['Mamul Adı']||'').trim(),
+      bolum:'Mutfak',grup:'',
+      ciktiMiktar:_parseNum(r['Son ürün miktarı']||r['Çıktı Miktarı'])||0,
+      ciktiBirim:normBirim(String(r['Son ürün birimi']||r['Çıktı Birimi']||'').trim())||'g',
+      porsiyonSayisi:1,satirlar:[]
+    })).filter(m=>m.ad);
+    // İçerikleri mamullere bağla
+    icerikRows.forEach(r=>{
+      const mamulAd=String(r['Yarı mamul']||r['Mamul Adı']||'').trim();
+      const m=mamuller.find(x=>x.ad===mamulAd);
+      if(!m) return;
+      const kaynak=String(r['Kaynak']||r['Malzeme']||'').trim();
+      const tip=String(r['Tip']||'').trim().toLowerCase();
+      const e=tip==='yarı mamul'?{tip:'yari',kaynakId:''}:_esles(kaynak,malzList,[]);
+      m.satirlar.push({id:uid(),...e,miktar:_parseNum(r['Miktar']),girisBirimi:normBirim(String(r['Birim']||'').trim())||'g',_ad:kaynak});
+    });
+    return mamuller;
+  }
+  return [];
 }
 
 function _parseTarif(wb, malzList, mamulList){
-  const ws = wb.Sheets['Mutfak Tarifleri']; if(!ws) return [];
-  const rows = XLSX.utils.sheet_to_json(ws,{header:1,defval:''});
-  const tarifler=[]; let cur=null;
-  for(let i=1;i<rows.length;i++){
-    const r=rows[i];
-    const kategori=String(r[0]||'').trim();
-    const ad=String(r[1]||'').trim();
-    const malz=String(r[6]||'').trim();
-    if(ad&&!malz){
-      if(cur) tarifler.push(cur);
-      cur={id:uid(),ad,bolum:'Mutfak',grup:kategori,yapilis:'',
-           porsiyon:parseFloat(String(r[2]||'').replace(',','.'))||1,
-           hedefKar:50,mevcutFiyat:0,adet:0,zorlukHazirlik:1,zorlukServis:1,satirlar:[]};
-    } else if(cur&&malz){
-      const miktar=parseFloat(String(r[7]||'').replace(',','.'))||0;
-      const birim=normBirim(String(r[8]||'').trim())||'g';
-      const temiz=malz.replace(/\s*\([^)]*yarı[^)]*\)/gi,'').replace(/\s*\([^)]*sunum[^)]*\)/gi,'').replace(/\s*\([^)]*fireli[^)]*\)/gi,'').trim();
-      const temizL=temiz.toLocaleLowerCase('tr-TR');
-      const yE=mamulList.find(y=>(y.ad||'').toLocaleLowerCase('tr-TR')===temizL);
-      const mE=malzList.find(m=>(m.ad||'').toLocaleLowerCase('tr-TR')===temizL);
-      if(yE) cur.satirlar.push({id:uid(),tip:'yari',kaynakId:yE.id,miktar,girisBirimi:birim,_ad:malz});
-      else if(mE) cur.satirlar.push({id:uid(),tip:'malzeme',kaynakId:mE.id,miktar,girisBirimi:birim,_ad:malz});
-      else cur.satirlar.push({id:uid(),tip:'malzeme',kaynakId:'',miktar,girisBirimi:birim,_ad:malz});
+  const wsYeni=wb.Sheets['Mutfak Tarifleri'];
+  const wsEski=wb.Sheets['Tarifler'];
+  const wsIcerik=wb.Sheets['Tarif İçerikleri'];
+
+  if(wsYeni){
+    const rows=XLSX.utils.sheet_to_json(wsYeni,{header:1,defval:''});
+    const tarifler=[]; let cur=null;
+    for(let i=1;i<rows.length;i++){
+      const r=rows[i];
+      const kategori=String(r[0]||'').trim();
+      const ad=String(r[1]||'').trim();
+      const malz=String(r[6]||'').trim();
+      if(ad&&!malz){
+        if(cur) tarifler.push(cur);
+        cur={id:uid(),ad,bolum:'Mutfak',grup:kategori,yapilis:'',
+             porsiyon:_parseNum(r[2])||1,hedefKar:50,mevcutFiyat:0,adet:0,
+             zorlukHazirlik:1,zorlukServis:1,satirlar:[]};
+      } else if(cur&&malz){
+        const e=_esles(malz,malzList,mamulList);
+        cur.satirlar.push({id:uid(),...e,miktar:_parseNum(r[7]),girisBirimi:normBirim(String(r[8]||'').trim())||'g',_ad:malz});
+      }
     }
+    if(cur) tarifler.push(cur);
+    return tarifler.filter(t=>t.ad);
   }
-  if(cur) tarifler.push(cur);
-  return tarifler.filter(t=>t.ad);
+
+  if(wsEski&&wsIcerik){
+    // Eski format
+    const tarifRows=XLSX.utils.sheet_to_json(wsEski,{defval:''});
+    const icerikRows=XLSX.utils.sheet_to_json(wsIcerik,{defval:''});
+    const tarifler=tarifRows.map(r=>({
+      id:uid(),
+      ad:String(r['Ürün']||r['Tarif Adı']||'').trim(),
+      bolum:String(r['Bölüm']||'Mutfak').trim()||'Mutfak',
+      grup:'',yapilis:String(r['Yapılışı']||''),
+      porsiyon:_parseNum(r['Porsiyon'])||1,
+      hedefKar:_parseNum(r['Hedef kâr (₺)'])||50,
+      mevcutFiyat:_parseNum(r['Belirlediğim fiyat (₺)'])||0,
+      adet:_parseNum(r['Yıllık adet'])||0,
+      zorlukHazirlik:_parseNum(r['Zorluk - Hazırlık'])||1,
+      zorlukServis:_parseNum(r['Zorluk - Servis'])||1,
+      satirlar:[]
+    })).filter(t=>t.ad);
+    icerikRows.forEach(r=>{
+      const tarifAd=String(r['Ürün']||r['Tarif Adı']||'').trim();
+      const t=tarifler.find(x=>x.ad===tarifAd);
+      if(!t) return;
+      const kaynak=String(r['Kaynak']||'').trim();
+      const tip=String(r['Tip']||'').trim().toLowerCase();
+      const e=tip==='yarı mamul'?{tip:'yari',kaynakId:(mamulList.find(y=>_normAd(y.ad)===_normAd(kaynak))||{}).id||''}:_esles(kaynak,malzList,mamulList);
+      t.satirlar.push({id:uid(),...e,miktar:_parseNum(r['Miktar']),girisBirimi:normBirim(String(r['Birim']||'').trim())||'g',_ad:kaynak});
+    });
+    return tarifler;
+  }
+  return [];
 }
 
 function _renderImportTab(tab){
