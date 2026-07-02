@@ -2832,20 +2832,23 @@ function gisLoaded(){
     client_id: CLIENT_ID,
     scope:     SCOPES,
     callback: async (resp)=>{
-      alert('Callback çalıştı: ' + JSON.stringify({error: resp.error, token: !!gapi.client.getToken()}));
       try{
         if(resp.error){ alert('OAuth hatası: ' + resp.error); return; }
-        const token = gapi.client.getToken();
-        if(!token){ alert('Token yok!'); return; }
+        const accessToken = resp.access_token;
+        if(!accessToken){ alert('Token alınamadı!'); return; }
+        // Token'ı gapi'ye set et (yüklendiyse)
+        if(typeof gapi !== 'undefined' && gapi.client){
+          gapi.client.setToken({access_token: accessToken});
+        }
+        window._accessToken = accessToken; // yedek olarak sakla
         const info = await fetch('https://www.googleapis.com/oauth2/v3/userinfo',{
-          headers:{Authorization:'Bearer '+token.access_token}
+          headers:{Authorization:'Bearer '+accessToken}
         }).then(r=>r.json());
-        alert('Kullanıcı: ' + info.email);
         document.getElementById('loginScreen').style.display = 'none';
         document.getElementById('appRoot').style.display = '';
         const nameEl = document.getElementById('driveUserName');
         if(nameEl) nameEl.textContent = info.name||info.email;
-        driveUser = {name: info.name||info.email, email: info.email};
+        driveUser = {name: info.name||info.email, email: info.email, token: accessToken};
         driveLoadOrCreate();
       }catch(e){
         alert('Hata: '+e.message);
@@ -2878,77 +2881,50 @@ function signOut(){
 }
 
 // ── Drive: Dosya bul veya oluştur ──────────────────────
+function getToken(){
+  return (driveUser&&driveUser.token)||window._accessToken||null;
+}
+
 async function driveLoadOrCreate(){
+  const token=getToken();if(!token){toast('Token bulunamadı');return;}
   toast('Drive\'dan yükleniyor...');
   try{
-    // Önce dosyayı ara
-    const res = await gapi.client.drive.files.list({
-      q:`name='${DRIVE_FILE_NAME}' and trashed=false`,
-      spaces:'drive',
-      fields:'files(id,name,modifiedTime)'
-    });
-    const files = res.result.files||[];
-    if(files.length > 0){
-      driveFileId = files[0].id;
-      await driveLoad();
-    } else {
-      // Yoksa oluştur
-      await driveCreate();
-      toast('Drive\'da yeni dosya oluşturuldu');
-    }
-  }catch(e){
-    console.error('Drive hatası:',e);
-    toast('Drive bağlantısı kurulamadı, yerel veri kullanılıyor');
-  }
+    const res=await fetch('https://www.googleapis.com/drive/v3/files?q='+encodeURIComponent(`name='${DRIVE_FILE_NAME}' and trashed=false`)+'&spaces=drive&fields=files(id,name)',
+      {headers:{Authorization:'Bearer '+token}}).then(r=>r.json());
+    const files=res.files||[];
+    if(files.length>0){driveFileId=files[0].id;await driveLoad();}
+    else{await driveCreate();toast('Drive\'da yeni dosya oluşturuldu');}
+  }catch(e){console.error('Drive hatası:',e);toast('Drive bağlantısı kurulamadı');}
 }
 
 async function driveLoad(){
+  const token=getToken();
   try{
-    const res = await gapi.client.drive.files.get({
-      fileId: driveFileId,
-      alt: 'media'
-    });
-    const data = typeof res.result === 'string' ? JSON.parse(res.result) : res.result;
-    state = normalize(data);
-    save(); // localStorage'a da yaz
-    renderAll();
-    toast('Drive\'dan yüklendi ✓');
-  }catch(e){
-    console.error('Drive yükleme hatası:',e);
-    toast('Drive\'dan yüklenemedi, yerel veri kullanılıyor');
-  }
+    const data=await fetch(`https://www.googleapis.com/drive/v3/files/${driveFileId}?alt=media`,
+      {headers:{Authorization:'Bearer '+token}}).then(r=>r.json());
+    state=normalize(data);save();renderAll();toast('Drive\'dan yüklendi ✓');
+  }catch(e){console.error('Drive yükleme hatası:',e);toast('Drive\'dan yüklenemedi');}
 }
 
 async function driveCreate(){
-  const json = JSON.stringify(state);
-  const boundary = '-------314159265358979323846';
-  const body = `--${boundary}\r\nContent-Type: application/json\r\n\r\n${
-    JSON.stringify({name:DRIVE_FILE_NAME,mimeType:'application/json'})
-  }\r\n--${boundary}\r\nContent-Type: application/json\r\n\r\n${json}\r\n--${boundary}--`;
-
-  const res = await gapi.client.request({
-    path:'/upload/drive/v3/files',
-    method:'POST',
-    params:{uploadType:'multipart'},
-    headers:{'Content-Type':`multipart/related; boundary="${boundary}"`},
-    body
-  });
-  driveFileId = res.result.id;
+  const token=getToken();
+  const boundary='-------314159265358979323846';
+  const meta=JSON.stringify({name:DRIVE_FILE_NAME,mimeType:'application/json'});
+  const body=`--${boundary}\r\nContent-Type: application/json\r\n\r\n${meta}\r\n--${boundary}\r\nContent-Type: application/json\r\n\r\n${JSON.stringify(state)}\r\n--${boundary}--`;
+  const res=await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart',{
+    method:'POST',headers:{Authorization:'Bearer '+token,'Content-Type':`multipart/related; boundary="${boundary}"`},body
+  }).then(r=>r.json());
+  driveFileId=res.id;
 }
 
 async function driveSave(){
-  if(!driveFileId){ await driveCreate(); return; }
+  const token=getToken();if(!token)return;
+  if(!driveFileId){await driveCreate();return;}
   try{
-    await gapi.client.request({
-      path:`/upload/drive/v3/files/${driveFileId}`,
-      method:'PATCH',
-      params:{uploadType:'media'},
-      headers:{'Content-Type':'application/json'},
-      body: JSON.stringify(state)
+    await fetch(`https://www.googleapis.com/upload/drive/v3/files/${driveFileId}?uploadType=media`,{
+      method:'PATCH',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'},body:JSON.stringify(state)
     });
-  }catch(e){
-    console.error('Drive kayıt hatası:',e);
-  }
+  }catch(e){console.error('Drive kayıt hatası:',e);}
 }
 
 // ── Otomatik kayıt (3 sn debounce) ────────────────────
