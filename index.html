@@ -3540,7 +3540,10 @@ setupDrag('tedarikcilerBody',{
 /* ============ GOOGLE DRIVE ENTEGRASYONU ============ */
 const CLIENT_ID = '708742039265-4j90ivdce58cvu7fq3k923akemq88p6q.apps.googleusercontent.com';
 const API_KEY   = '';  // Drive API key gerekmez, OAuth yeterli
-const SCOPES    = 'https://www.googleapis.com/auth/drive.file';
+const _sefModu  = new URLSearchParams(location.search).has('f');
+const SCOPES    = _sefModu
+  ? 'https://www.googleapis.com/auth/drive.readonly'
+  : 'https://www.googleapis.com/auth/drive.file';
 const DRIVE_FILE_NAME = 'mutfak_sistemi.json';
 
 let driveFileId   = null;
