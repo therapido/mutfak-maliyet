@@ -3637,12 +3637,22 @@ function signOut(){
 }
 
 // ── Drive: Dosya bul veya oluştur ──────────────────────
-async function sefGiris(fileId){
+async function sefGiris(fileIdRaw){
   const token=window._accessToken;
-  try{
-    const res=await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`,
+  // Drive ID'leri sadece harf/rakam/-/_ içerir; linkten gelen görünmez karakterleri temizle
+  const fileId=String(fileIdRaw||'').trim().replace(/[^A-Za-z0-9_-]/g,'');
+  if(!fileId){alert('Bağlantı hatalı görünüyor. Yöneticiden yeni bağlantı isteyin.');return;}
+  const oku=()=>fetch('https://www.googleapis.com/drive/v3/files/'+fileId+'?alt=media',
       {headers:{Authorization:'Bearer '+token}});
-    if(!res.ok) throw new Error('Dosya okunamadı ('+res.status+'). Yöneticinin paylaşımı açtığından emin olun.');
+  try{
+    let res;
+    try{ res=await oku(); }
+    catch(agHata){ await new Promise(r=>setTimeout(r,1200)); res=await oku(); } // ağ hatasında 1 tekrar
+    if(!res.ok){
+      const sebep=res.status===404?'Dosya bulunamadı — yönetici "Paylaşımı Aç" butonuna basmamış olabilir.':
+                  res.status===403?'Erişim reddedildi — yönetici paylaşımı açmalı.':'Hata kodu: '+res.status;
+      throw new Error(sebep);
+    }
     const data=await res.json();
     // Şefin kendi cihazındaki sipariş seçimlerini koru
     const localSiparis=state&&state.siparis?state.siparis:{};
