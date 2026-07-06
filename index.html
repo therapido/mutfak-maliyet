@@ -3,6 +3,14 @@
 <head>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <meta charset="UTF-8">
+<meta name="theme-color" content="#0d3b2e">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Mutfak">
+<link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='22' fill='%230d3b2e'/%3E%3Ctext x='50' y='66' font-size='52' font-family='Arial' font-weight='bold' fill='white' text-anchor='middle'%3EM%3C/text%3E%3C/svg%3E">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='22' fill='%230d3b2e'/%3E%3Ctext x='50' y='66' font-size='52' font-family='Arial' font-weight='bold' fill='white' text-anchor='middle'%3EM%3C/text%3E%3C/svg%3E">
+<link rel="manifest" href='data:application/manifest+json,{"name":"Mutfak Maliyet","short_name":"Mutfak","start_url":".","scope":".","display":"standalone","background_color":"%23f2efe6","theme_color":"%230d3b2e","icons":[{"src":"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='22' fill='%230d3b2e'/%3E%3Ctext x='50' y='66' font-size='52' font-family='Arial' font-weight='bold' fill='white' text-anchor='middle'%3EM%3C/text%3E%3C/svg%3E","sizes":"any","type":"image/svg+xml","purpose":"any"}]}'>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Mutfak Maliyet · Base Bungalows</title>
 <style>
@@ -223,8 +231,12 @@
   .ted-field input,.ted-field textarea{font-size:13.5px;padding:7px 10px;border-radius:8px;border:1px solid var(--line);font-family:var(--sans);color:var(--ink)}
   .ted-field input:focus,.ted-field textarea:focus{outline:2px solid var(--pine);border-color:var(--pine)}
   /* Sipariş modu (şef) kısıtları */
-  body[data-rol="siparis"] nav button{display:none}
-  body[data-rol="siparis"] nav button[data-tab="tedarikciler"]{display:block}
+  body[data-rol="siparis"] nav{display:none}
+  body[data-rol="siparis"] header{padding:8px 14px;gap:10px}
+  body[data-rol="siparis"] header .brand b{font-size:14.5px}
+  body[data-rol="siparis"] header .brand small,body[data-rol="siparis"] header div[style*="v8"]{display:none}
+  body[data-rol="siparis"] #tab-tedarikciler .h2-row{display:none}
+  body[data-rol="siparis"] main{padding-top:8px}
   body[data-rol="siparis"] #ayarlarBtn{display:none!important}
   body[data-rol="siparis"] .ted-admin{display:none!important}
   body[data-rol="siparis"] #addTedarikci{display:none!important}
@@ -3159,6 +3171,10 @@ function tedCardHtml(t){
   </div>`;
 }
 
+function waAc(url){
+  const w=window.open(url,'_blank');
+  if(!w||w.closed||typeof w.closed==='undefined'){ location.href=url; } // popup engellendi → aynı sekmede
+}
 function gorunurTedarikciler(){
   if(!window._izinliTedId) return state.tedarikciler;
   return state.tedarikciler.filter(t=>window._izinliTedId.has(t.id));
@@ -3301,7 +3317,7 @@ document.getElementById('sefGonderBtn').addEventListener('click',()=>{
   if(!toplam){toast('Hiç ürün seçilmedi.');return;}
   msg+='\nTeşekkürler.';
   if(driveUser&&driveUser.email)msg+='\n👤 Gönderen: '+driveUser.email;
-  window.open(`https://wa.me/90${adminTel}?text=${encodeURIComponent(msg)}`,'_blank');
+  waAc(`https://wa.me/90${adminTel}?text=${encodeURIComponent(msg)}`);
 });
 
 // Sorumlu seçim paneli (WhatsApp)
@@ -3419,7 +3435,7 @@ document.getElementById('tedarikcilerBody').addEventListener('click',e=>{
       msg+='\nTeşekkürler.';
       if(sor._gonderen)msg+='\n👤 Gönderen: '+sor._gonderen;
       const tel=(sor.telefon||'').replace(/\D/g,'').replace(/^0/,'');
-      window.open(`https://wa.me/90${tel}?text=${encodeURIComponent(msg)}`,'_blank');
+      waAc(`https://wa.me/90${tel}?text=${encodeURIComponent(msg)}`);
     };
     if(window._rol==='siparis'){
       const adminTel=(state.genel&&state.genel.adminTelefon)||'';
