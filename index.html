@@ -2151,11 +2151,29 @@ function renderKullanicilar(){
   const box=document.getElementById('kullaniciListe');
   const liste=state.kullanicilar||[];
   if(!liste.length){box.innerHTML='<div style="font-size:12.5px;color:var(--ink-soft);padding:6px 0">Henüz kullanıcı eklenmedi.</div>';return;}
-  box.innerHTML=liste.map((k,i)=>`<div style="display:flex;align-items:center;gap:10px;padding:7px 10px;border:1px solid var(--line);border-radius:9px;margin-bottom:6px">
-    <span style="flex:1;font-size:13.5px">${esc(k.email)}</span>
-    <span style="font-size:11px;background:#e8f0ec;color:var(--pine);padding:2px 8px;border-radius:8px;font-weight:700">${k.rol==='admin'?'Yönetici':'Sipariş'}</span>
-    <button class="xbtn" data-kulldel="${i}">×</button>
-  </div>`).join('');
+  box.innerHTML=liste.map((k,i)=>{
+    const tumu=!Array.isArray(k.tedarikciler);
+    const tedListe=(state.tedarikciler||[]).map(t=>
+      `<label style="display:flex;align-items:center;gap:7px;font-size:12.5px;padding:3px 0;cursor:pointer;${tumu?'opacity:.45':''}">
+        <input type="checkbox" data-kt="${i}:${t.id}" ${tumu||k.tedarikciler.includes(t.id)?'checked':''} ${tumu?'disabled':''} style="width:15px;height:15px;accent-color:var(--pine)">
+        ${esc(t.ad||'(adsız)')}
+      </label>`).join('');
+    return `<div style="border:1px solid var(--line);border-radius:9px;margin-bottom:6px;padding:7px 10px">
+    <div style="display:flex;align-items:center;gap:10px">
+      <span style="flex:1;font-size:13.5px">${esc(k.email)}</span>
+      <span style="font-size:11px;background:#e8f0ec;color:var(--pine);padding:2px 8px;border-radius:8px;font-weight:700">${k.rol==='admin'?'Yönetici':'Sipariş'}</span>
+      <button class="xbtn" data-kulldel="${i}">×</button>
+    </div>
+    <details style="margin-top:5px">
+      <summary style="font-size:11.5px;color:var(--ink-soft);cursor:pointer">Görebildiği tedarikçiler: <b style="color:var(--ink)">${tumu?'Tümü':k.tedarikciler.length+' seçili'}</b></summary>
+      <div style="padding:7px 4px 2px">
+        <label style="display:flex;align-items:center;gap:7px;font-size:12.5px;font-weight:700;padding:3px 0;cursor:pointer;border-bottom:1px dashed var(--line);margin-bottom:4px">
+          <input type="checkbox" data-ktall="${i}" ${tumu?'checked':''} style="width:15px;height:15px;accent-color:var(--pine)"> Tümü
+        </label>
+        ${tedListe}
+      </div>
+    </details>
+  </div>`;}).join('');
 }
 document.getElementById('kullaniciBtn').addEventListener('click',()=>{
   closeDrawer();
@@ -2183,6 +2201,26 @@ document.getElementById('kullaniciListe').addEventListener('click',e=>{
   if(del){
     state.kullanicilar.splice(+del.dataset.kulldel,1);
     save();renderKullanicilar();
+  }
+});
+document.getElementById('kullaniciListe').addEventListener('change',e=>{
+  // "Tümü" anahtarı
+  if(e.target.dataset.ktall!==undefined){
+    const k=state.kullanicilar[+e.target.dataset.ktall];if(!k)return;
+    if(e.target.checked){delete k.tedarikciler;}
+    else{k.tedarikciler=(state.tedarikciler||[]).map(t=>t.id);} // hepsiyle başla, istemediklerini kaldırır
+    save();renderKullanicilar();return;
+  }
+  // Tekil tedarikçi
+  if(e.target.dataset.kt){
+    const [i,tid]=e.target.dataset.kt.split(':');
+    const k=state.kullanicilar[+i];if(!k||!Array.isArray(k.tedarikciler))return;
+    if(e.target.checked){if(!k.tedarikciler.includes(tid))k.tedarikciler.push(tid);}
+    else{k.tedarikciler=k.tedarikciler.filter(x=>x!==tid);}
+    save();
+    // Özet sayıyı güncelle (details kapanmasın diye tam render yok)
+    const sum=e.target.closest('details')?.querySelector('summary b');
+    if(sum)sum.textContent=k.tedarikciler.length+' seçili';
   }
 });
 document.getElementById('sefLinkBtn').addEventListener('click',async()=>{
@@ -3121,8 +3159,12 @@ function tedCardHtml(t){
   </div>`;
 }
 
+function gorunurTedarikciler(){
+  if(!window._izinliTedId) return state.tedarikciler;
+  return state.tedarikciler.filter(t=>window._izinliTedId.has(t.id));
+}
 function tedTakvimHtml(){
-  const teds=(state.tedarikciler||[]).filter(t=>t.ad&&(t.siparisGunleri.length||t.teslimatGunleri.length));
+  const teds=gorunurTedarikciler().filter(t=>t.ad&&(t.siparisGunleri.length||t.teslimatGunleri.length));
   if(!teds.length)return '';
   let html=`<div class="card" style="margin-bottom:16px;overflow-x:auto"><div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--ink-soft);margin-bottom:10px">Haftalık Takvim</div><table style="width:100%;border-collapse:collapse;font-size:12px;min-width:500px"><thead><tr><th style="text-align:left;padding:5px 8px;border-bottom:2px solid var(--line);font-size:10px;color:var(--ink-soft);text-transform:uppercase">Firma</th>`;
   GUN_UZUN.forEach(g=>{ html+=`<th style="text-align:center;padding:5px 6px;border-bottom:2px solid var(--line);font-size:10px;color:var(--ink-soft);text-transform:uppercase">${g}</th>`; });
@@ -3160,7 +3202,7 @@ function renderTedarikciler(){
   if(!(state.tedarikciler||[]).length){
     box.innerHTML='<div id="tedTakvimBox">'+tedTakvimHtml()+'</div><div class="empty">Henüz tedarikçi eklenmedi.</div>';return;
   }
-  box.innerHTML='<div id="tedTakvimBox">'+tedTakvimHtml()+'</div>'+state.tedarikciler.map(t=>tedCardHtml(t)).join('');
+  box.innerHTML='<div id="tedTakvimBox">'+tedTakvimHtml()+'</div>'+gorunurTedarikciler().map(t=>tedCardHtml(t)).join('');
   if(typeof sefSayacGuncelle==='function')sefSayacGuncelle();
 }
 
@@ -3178,6 +3220,7 @@ function sefSayacGuncelle(){
   const bar=document.getElementById('sefGonderSay');if(!bar)return;
   let firma=0,urun=0;
   Object.keys(state.siparis||{}).forEach(f=>{
+    if(window._izinliTedAd&&!window._izinliTedAd.has(f))return;
     const sec=Object.keys(state.siparis[f]||{}).filter(id=>state.siparis[f][id].secili&&state.malzemeler.find(m=>m.id===id));
     if(sec.length){firma++;urun+=sec.length;}
   });
@@ -3240,6 +3283,7 @@ document.getElementById('sefGonderBtn').addEventListener('click',()=>{
   let msg=`Merhaba\n📦 ${tarih} tarihli sipariş listesi:\n`;
   let toplam=0;
   Object.keys(state.siparis||{}).forEach(firma=>{
+    if(window._izinliTedAd&&!window._izinliTedAd.has(firma))return;
     const ids=Object.keys(state.siparis[firma]||{}).filter(id=>state.siparis[firma][id].secili);
     const satirlar=ids.map(id=>{
       const m=state.malzemeler.find(x=>x.id===id);if(!m)return null;
@@ -3806,6 +3850,10 @@ async function sefGiris(fileIdRaw){
       return;
     }
     window._rol=k.rol||'siparis';
+    if(Array.isArray(k.tedarikciler)){
+      window._izinliTedId=new Set(k.tedarikciler);
+      window._izinliTedAd=new Set(state.tedarikciler.filter(t=>window._izinliTedId.has(t.id)).map(t=>t.ad));
+    }
     if(window._rol==='siparis'){
       // Şef tüm listeyi tek bakışta görsün: bütün kartlar açık
       (state.tedarikciler||[]).forEach(t=>expandedTed.add(t.id));
