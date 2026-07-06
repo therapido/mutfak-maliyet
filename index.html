@@ -3171,9 +3171,10 @@ function tedCardHtml(t){
   </div>`;
 }
 
-function waAc(url){
+function waAc(url,ayniSekme){
+  if(ayniSekme){ location.href=url; return; } // mobil/şef: en garantili yol
   const w=window.open(url,'_blank');
-  if(!w||w.closed||typeof w.closed==='undefined'){ location.href=url; } // popup engellendi → aynı sekmede
+  if(!w||w.closed||typeof w.closed==='undefined'){ location.href=url; }
 }
 function gorunurTedarikciler(){
   if(!window._izinliTedId) return state.tedarikciler;
@@ -3294,7 +3295,7 @@ document.getElementById('tedarikcilerBody').addEventListener('change',e=>{
 // Toplu gönder (şef): tüm firmaların seçili ürünleri tek mesajda admin'e
 document.getElementById('sefGonderBtn').addEventListener('click',()=>{
   const adminTel=((state.genel&&state.genel.adminTelefon)||'').replace(/\D/g,'').replace(/^0/,'');
-  if(!adminTel){toast('Yönetici bildirim numarası tanımlamamış.');return;}
+  if(!adminTel){alert('Sipariş gönderilemiyor:\nYönetici henüz "Sipariş Bildirim Numarası" tanımlamamış.\n(Ayarlar → Kullanıcı Yönetimi)');return;}
   const tarih=new Date().toLocaleDateString('tr-TR',{weekday:'long',day:'numeric',month:'long'});
   let msg=`Merhaba\n📦 ${tarih} tarihli sipariş listesi:\n`;
   let toplam=0;
@@ -3317,7 +3318,7 @@ document.getElementById('sefGonderBtn').addEventListener('click',()=>{
   if(!toplam){toast('Hiç ürün seçilmedi.');return;}
   msg+='\nTeşekkürler.';
   if(driveUser&&driveUser.email)msg+='\n👤 Gönderen: '+driveUser.email;
-  waAc(`https://wa.me/90${adminTel}?text=${encodeURIComponent(msg)}`);
+  waAc(`https://wa.me/90${adminTel}?text=${encodeURIComponent(msg)}`,true);
 });
 
 // Sorumlu seçim paneli (WhatsApp)
@@ -3435,11 +3436,11 @@ document.getElementById('tedarikcilerBody').addEventListener('click',e=>{
       msg+='\nTeşekkürler.';
       if(sor._gonderen)msg+='\n👤 Gönderen: '+sor._gonderen;
       const tel=(sor.telefon||'').replace(/\D/g,'').replace(/^0/,'');
-      waAc(`https://wa.me/90${tel}?text=${encodeURIComponent(msg)}`);
+      waAc(`https://wa.me/90${tel}?text=${encodeURIComponent(msg)}`,window._rol==='siparis');
     };
     if(window._rol==='siparis'){
       const adminTel=(state.genel&&state.genel.adminTelefon)||'';
-      if(!adminTel){toast('Yönetici bildirim numarası tanımlamamış.');return;}
+      if(!adminTel){alert('Sipariş gönderilemiyor:\nYönetici henüz "Sipariş Bildirim Numarası" tanımlamamış.');return;}
       gonder({ad:'Yönetim',telefon:adminTel,_gonderen:driveUser?driveUser.email:''});
       return;
     }
