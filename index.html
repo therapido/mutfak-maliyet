@@ -2257,7 +2257,9 @@ document.getElementById('sefLinkBtn').addEventListener('click',async()=>{
       headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'},
       body:JSON.stringify({role:'reader',type:'anyone'})
     });
-    const link=location.origin+location.pathname+'?f='+driveFileId;
+    if(window.flushDriveSave){try{await driveSave();}catch(e){}}
+    const telParam=((state.genel&&state.genel.adminTelefon)||'').replace(/\D/g,'').replace(/^0/,'');
+    const link=location.origin+location.pathname+'?f='+driveFileId+(telParam?'&t=90'+telParam:'');
     try{await navigator.clipboard.writeText(link);}catch(e){}
     sonuc.style.color='var(--pine)';
     sonuc.textContent='✓ Kopyalandı: '+link;
@@ -3305,8 +3307,12 @@ document.getElementById('tedarikcilerBody').addEventListener('change',e=>{
 });
 // Toplu gönder (şef): tüm firmaların seçili ürünleri tek mesajda admin'e
 document.getElementById('sefGonderBtn').addEventListener('click',()=>{
-  const adminTel=((state.genel&&state.genel.adminTelefon)||'').replace(/\D/g,'').replace(/^0/,'');
-  if(!adminTel){alert('Sipariş gönderilemiyor:\nYönetici henüz "Sipariş Bildirim Numarası" tanımlamamış.\n(Ayarlar → Kullanıcı Yönetimi)');return;}
+  let adminTel=((state.genel&&state.genel.adminTelefon)||'').replace(/\D/g,'').replace(/^0/,'');
+  if(!adminTel){
+    const urlTel=(new URLSearchParams(location.search).get('t')||'').replace(/\D/g,'');
+    if(urlTel)adminTel=urlTel.replace(/^90/,'');
+  }
+  if(!adminTel){alert('Sipariş gönderilemiyor:\nYönetici henüz "Sipariş Bildirim Numarası" tanımlamamış.\nYöneticiden YENİ bağlantı isteyin (Ayarlar → Kullanıcı Yönetimi → Paylaşımı Aç).');return;}
   const tarih=new Date().toLocaleDateString('tr-TR',{weekday:'long',day:'numeric',month:'long'});
   let msg=`Merhaba\n📦 ${tarih} tarihli sipariş listesi:\n`;
   let toplam=0;
@@ -3450,7 +3456,11 @@ document.getElementById('tedarikcilerBody').addEventListener('click',e=>{
       waAc(`https://wa.me/90${tel}?text=${encodeURIComponent(msg)}`,window._rol==='siparis');
     };
     if(window._rol==='siparis'){
-      const adminTel=(state.genel&&state.genel.adminTelefon)||'';
+      let adminTel=(state.genel&&state.genel.adminTelefon)||'';
+      if(!adminTel){
+        const urlTel=(new URLSearchParams(location.search).get('t')||'').replace(/\D/g,'');
+        if(urlTel)adminTel='0'+urlTel.replace(/^90/,'');
+      }
       if(!adminTel){alert('Sipariş gönderilemiyor:\nYönetici henüz "Sipariş Bildirim Numarası" tanımlamamış.');return;}
       gonder({ad:'Yönetim',telefon:adminTel,_gonderen:driveUser?driveUser.email:''});
       return;
