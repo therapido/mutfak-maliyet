@@ -249,15 +249,21 @@
   .sip-secili{background:#f0f8f4}
   .sip-chk{width:20px;height:20px;accent-color:var(--pine);cursor:pointer}
   @media(max-width:640px){
-    .sip-item{grid-template-columns:26px minmax(0,1fr) auto auto!important;grid-template-rows:auto;column-gap:8px;padding:9px 10px!important;align-items:center}
-    .sip-item .sip-chk{grid-column:1}
-    .sip-item .sip-item-ad{grid-column:2;font-weight:600;font-size:14px;line-height:1.25;white-space:normal;overflow-wrap:break-word}
-    .sip-item .sip-item-birim{grid-column:3;font-size:11.5px;white-space:nowrap;padding:0}
-    .sip-item .sip-stepper{grid-column:4}
-    .sip-item .sip-item-not{display:none;grid-column:2/5;grid-row:2;margin-top:7px}
+    main{padding-left:6px;padding-right:6px}
+    .ted-card-body{padding:8px 4px}
+    .sip-ara{margin:6px 4px 4px;width:calc(100% - 8px);padding:8px 10px;font-size:13px}
+    .sip-item{grid-template-columns:24px minmax(0,1fr) auto auto!important;grid-template-rows:auto;column-gap:6px;padding:8px 4px!important;align-items:center}
+    .sip-item .sip-chk{grid-column:1;grid-row:1;width:19px;height:19px}
+    .sip-item .sip-item-ad{grid-column:2;grid-row:1;font-weight:600;font-size:13px;line-height:1.2;white-space:normal;overflow-wrap:break-word}
+    .sip-item .sip-item-birim{grid-column:3;grid-row:1;font-size:10.5px;white-space:nowrap;padding:0;color:var(--ink-soft)}
+    .sip-item .sip-stepper{grid-column:4;grid-row:1}
+    .sip-stepper button{width:27px;height:29px;font-size:15px}
+    .sip-stepper .sip-item-adet{width:32px;padding:4px 0;font-size:13px}
+    .sip-item .sip-item-not{display:none;grid-column:2/5;grid-row:2;margin-top:6px}
     .sip-item.sip-secili .sip-item-not{display:block}
     .sip-item .sip-item-clear{display:none}
     .sip-head-row{display:none!important}
+    body[data-rol="siparis"] .ted-card{border-radius:10px}
   }
   body[data-rol="siparis"] .sip-item-clear{display:none!important}
   /* Şef modu: alt sabit gönder çubuğu */
@@ -375,7 +381,7 @@
 <div id="appRoot" style="display:none">
 <header>
   <div class="brand"><b>Mutfak Maliyet</b><span>Base Bungalows</span></div>
-  <div style="font-size:10px;color:rgba(255,255,255,.4);margin-left:8px">v8</div>
+  <div style="font-size:10px;color:rgba(255,255,255,.4);margin-left:8px">v9</div>
   <div class="sp"></div>
   <div style="display:flex;align-items:center;gap:10px;margin-right:8px">
     <span style="font-size:12px;color:#eef3f0;opacity:.8"><span id="driveUserName"></span></span>
